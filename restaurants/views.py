@@ -1,19 +1,43 @@
 from django.shortcuts import render, redirect
-from .models import Restaurant, Item
+from .models import Restaurant, Item, FavoriteRestaurant
 from .forms import RestaurantForm, ItemForm, SignupForm, SigninForm
 from django.contrib.auth import login, authenticate, logout
 from django.db.models import Q
+from django.http import JsonResponse
 
 # This view will be used to favorite a restaurant
 def restaurant_favorite(request, restaurant_id):
-    
-    return
+    if request.user.is_anonymous:
+        return redirect('signin')
+    restaurant_obj = Restaurant.objects.get(id=restaurant_id)
+    favorite_obj, created = FavoriteRestaurant.objects.get_or_create(user=request.user, restaurant =restaurant_obj)
+    if created:
+        favorite= True
+    else:
+        favorite= False
+        favorite_obj.delete()
+    data = {
+        'favorite': favorite,
+    }
+    return JsonResponse(data, safe=False)
 
 
 # This view will be used to display only restaurants a user has favorited
 def favorite_restaurants(request):
-    
-    return
+    if request.user.is_anonymous:
+        return redirect('signin')
+    favorite_restaurants= FavoriteRestaurant.objects.filter(user=request.user).values_list('restaurant_id', flat=True)
+
+    favorite_restaurants_obj= []
+
+    for item in favorite_restaurants:
+        restaurant_obj = Restaurant.objects.get(id=item)
+        favorite_restaurants_obj.append(restaurant_obj)
+
+    context = {
+        'favorite_restaurants_obj': favorite_restaurants_obj,
+    }
+    return render(request, 'favorite_restaurant.html', context)
 
 
 def no_access(request):
@@ -61,6 +85,9 @@ def signout(request):
 def restaurant_list(request):
     restaurants = Restaurant.objects.all()
     query = request.GET.get('q')
+
+    
+
     if query:
         # Not Bonus. Querying through a single field.
         # restaurants = restaurants.filter(name__icontains=query)
@@ -72,8 +99,16 @@ def restaurant_list(request):
             Q(owner__username__icontains=query)
         ).distinct()
         #############
+
+    favorite_restaurants = []
+    if not request.user.is_anonymous:
+        favorite_restaurants= FavoriteRestaurant.objects.filter(user=request.user).values_list('restaurant_id', flat=True)
+    
+        redirect('signin')
+    
     context = {
-       "restaurants": restaurants
+       "restaurants": restaurants,
+       'favorite_restaurants': favorite_restaurants,
     }
     return render(request, 'list.html', context)
 
